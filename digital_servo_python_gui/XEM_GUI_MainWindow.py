@@ -214,13 +214,31 @@ class XEM_GUI_MainWindow(QtGui.QWidget):
 		# Start the timer which reads the dither:
 		self.timerIDDither.start(100)   # 100 ms readout delay, increased to 1000 ms for debugging
 
+	def updateDACOffset_event(self): # Transfers slider value to qedit and calls set_DACOffset_event
+		for k in range(3):
+			if self.output_controls[k] == True:
+				# Convert from slider units to volts (via counts)
+				q_dac_offset_in_slider_units = self.q_dac_offset[k].value()
+				q_dac_offset_in_volts = q_dac_offset_in_slider_units/1e6 * float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_high[k]) - self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_low[k])) + float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_low[k]))
+
+				# Update qedit_dac_offset
+				self.qedit_dac_offset[k].blockSignals(True)
+				self.qedit_dac_offset[k].setText(str(round(q_dac_offset_in_volts,3)))
+				self.qedit_dac_offset[k].blockSignals(False)
+				
+				self.setDACOffset_event()
+				
 	def setDACOffset_event(self):
 		for k in range(3):
 			if self.output_controls[k] == True:
 				# We need to convert between the units of the slider (0 to 1e6 integers) to counts.
 				# 0 corresponds to the DAC lowest limit and 1e6 to the DAC highest limit:
 #                print 'k = %d, self.sl.DACs_limit_low[k] = %d, self.sl.DACs_limit_high[k] = %d' % (k, self.sl.DACs_limit_low[k], self.sl.DACs_limit_high[k])
-				counts_input = (float(self.qedit_dac_offset[k].text()) - float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_high[k]))) / float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_high[k]) - self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_low[k]))
+				try:
+					counts_input = (float(self.qedit_dac_offset[k].text()) - float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_high[k]))) / float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_high[k]) - self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_low[k]))
+				except ValueError:
+					print('Unable to convert input to float')
+					return
 				counts_offset = int(self.sl.DACs_limit_low[k] + float(self.sl.DACs_limit_high[k] - self.sl.DACs_limit_low[k]) * counts_input)
 				self.sl.set_dac_offset(k, counts_offset)
 				try:
@@ -232,18 +250,27 @@ class XEM_GUI_MainWindow(QtGui.QWidget):
 				current_output_in_volts = self.sl.convertDACCountsToVolts(k, counts_offset)
 				current_output_in_hz = current_output_in_volts * VCO_gain_in_Hz_per_Volts
 				self.qlabel_dac_offset_value[k].setText('{:.4f} V\n{:.0f} MHz'.format(current_output_in_volts, current_output_in_hz/1e6))
+				
+				q_dac_offset_in_slider_units = 1e6 + float(counts_offset-self.sl.DACs_limit_low[k])*1e6/float(self.sl.DACs_limit_high[k] - self.sl.DACs_limit_low[k])
+				self.q_dac_offset[k].blockSignals(True)
+				self.q_dac_offset[k].setValue(q_dac_offset_in_slider_units) # units are wrong
+				self.q_dac_offset[k].blockSignals(False)
 
 	def getDACoffset(self):
 		for k in range(3):
 			if self.output_controls[k] == True:
 				self.sl.get_dac_limits(k)
 				counts_offset = self.sl.get_dac_offset(k)
-				q_dac_offset = float(counts_offset-self.sl.DACs_limit_low[k])/float(self.sl.DACs_limit_high[k] - self.sl.DACs_limit_low[k]) * float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_high[k]) - self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_low[k])) + float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_low[k]))
+				q_dac_offset_in_volts = float(counts_offset-self.sl.DACs_limit_low[k])/float(self.sl.DACs_limit_high[k] - self.sl.DACs_limit_low[k]) * float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_high[k]) - self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_low[k])) + float(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_low[k]))
+				q_dac_offset_in_slider_units = 1e6 + float(counts_offset-self.sl.DACs_limit_low[k])*1e6/float(self.sl.DACs_limit_high[k] - self.sl.DACs_limit_low[k])
 
 				self.qedit_dac_offset[k].blockSignals(True)
-				self.qedit_dac_offset[k].setText(str(q_dac_offset))
+				self.qedit_dac_offset[k].setText(str(q_dac_offset_in_volts))
 				self.qedit_dac_offset[k].blockSignals(False)
-
+				self.q_dac_offset[k].blockSignals(True)
+				self.q_dac_offset[k].setValue(q_dac_offset_in_slider_units) # units are wrong
+				self.q_dac_offset[k].blockSignals(False)
+				
 				try:
 					VCO_gain_in_Hz_per_Volts = float(self.qedit_vco_gain[k].text())
 				except:
@@ -310,8 +337,8 @@ class XEM_GUI_MainWindow(QtGui.QWidget):
 					
 	#                print('small_step = %f' % small_step)
 	#                print('large_step = %f' % large_step)
-#				self.q_dac_offset[k].setSingleStep(small_step) # JShaw
-#				self.q_dac_offset[k].setPageStep(large_step)
+				self.q_dac_offset[k].setSingleStep(small_step) # JShaw
+				self.q_dac_offset[k].setPageStep(large_step)
 
 		# This function needs the VCO gain to compute the control effort so we have to update it if we have changed.
 		self.setDACOffset_event()
@@ -348,8 +375,8 @@ class XEM_GUI_MainWindow(QtGui.QWidget):
 				if large_step > 1e6:
 					large_step = 1e6
 
-#				self.q_dac_offset[k].setSingleStep(small_step) #JShaw
-#				self.q_dac_offset[k].setPageStep(large_step)
+				self.q_dac_offset[k].setSingleStep(small_step) #JShaw
+				self.q_dac_offset[k].setPageStep(large_step)
 	##
 	## HB, 4/27/2015, Added PWM support on DOUT0
 	##
@@ -1239,9 +1266,19 @@ class XEM_GUI_MainWindow(QtGui.QWidget):
 				self.qlabel_dac_offset[k] = Qt.QLabel('Offset\nDAC %d [V]' % k)
 				self.qlabel_dac_offset[k].setAlignment(Qt.Qt.AlignHCenter)
 				
+				self.q_dac_offset[k] = Qt.QSlider()
+				self.q_dac_offset[k].valueChanged.connect(self.updateDACOffset_event) #sliderReleased also works instead of valueChanged
+				self.q_dac_offset[k].setSliderPosition(0)
+				self.q_dac_offset[k].setOrientation(Qt.Qt.Vertical)
+#				self.q_dac_offset[k].setMinimum(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_low[k]))
+#				self.q_dac_offset[k].setMaximum(self.sl.convertDACCountsToVolts(k, self.sl.DACs_limit_high[k]))
+				self.q_dac_offset[k].setMinimum(0)
+				self.q_dac_offset[k].setMaximum(1e6)
+				
 				self.qedit_dac_offset[k] = Qt.QLineEdit('0') #JShaw
 				self.qedit_dac_offset[k].setMaximumWidth(60)
 				self.qedit_dac_offset[k].returnPressed.connect(self.setDACOffset_event)
+#				self.qedit_dac_offset[k].textEdited.connect(self.setDACOffset_event) # Jonah unsure but this is emitted when the text is changed programatically
 
 		
 				self.qlabel_dac_current_value[k] = Qt.QLabel('0 V')
@@ -1353,8 +1390,11 @@ class XEM_GUI_MainWindow(QtGui.QWidget):
 				grid.addWidget(self.qthermo_dac_current[k],    1, 2+N_dac_controls, 3, 1)
 				grid.addWidget(self.qlabel_dac_current_value[k],4, 2+N_dac_controls, 1, 1)
 				grid.addWidget(self.qlabel_dac_offset[k],      0, 3+N_dac_controls)
-				grid.addWidget(self.qedit_dac_offset[k],	  1, 3+N_dac_controls, 3, 1)
-				grid.addWidget(self.qlabel_dac_offset_value[k],4, 3+N_dac_controls, 1, 1)
+				grid.addWidget(self.q_dac_offset[k],           1, 3+N_dac_controls, 3, 1)
+#				grid.addWidget(self.qedit_dac_offset[k],	  1, 4+N_dac_controls, 3, 1)
+				grid.addWidget(self.qedit_dac_offset[k],4, 3+N_dac_controls, 1, 1)
+
+#				grid.addWidget(self.qlabel_dac_offset_value[k],4, 3+N_dac_controls, 1, 1)
 				
 				
 				N_dac_controls = N_dac_controls + 2
@@ -2178,7 +2218,7 @@ class XEM_GUI_MainWindow(QtGui.QWidget):
 				self.curve_DDC0_spc.setData(time_axis, inst_freq)
 				self.curve_DDC0_spc_avg.setVisible(False)
 				self.curve_DDC0_cumul_phase.setVisible(False)
-				self.qplt_DDC0_spc.setTitle('Instantaneous frequency error, std dev = %.1f kHz' % (np.std(inst_freq_decimated)/1e3))
+				self.qplt_DDC0_spc.setTitle('Instantaneous frequency error, std dev = %.1f kHz, avg = %.1f kHz' % (np.std(inst_freq_decimated)/1e3,np.average(inst_freq_decimated)/1e3))
 				self.qplt_DDC0_spc.setLabel('left', 'Freq [Hz]')
 				self.qplt_DDC0_spc.setLabel('bottom', 'Time [s]')
 #                self.qplt_DDC0_spc.setAxisScale(Qwt.QwtPlot.yLeft, -self.sl.fs/2, self.sl.fs/2)
