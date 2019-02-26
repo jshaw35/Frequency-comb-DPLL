@@ -296,8 +296,9 @@ class SuperLaserLand_JD_RP:
 		self.controller = controller
 
 		self.dev = RP_PLL.RP_PLL_device(self.controller)
+		self.set_dac_limits(0, self.DACs_limit_low[0], self.DACs_limit_high[0], bSendToFPGA = True)
+		self.set_dac_limits(1, self.DACs_limit_low[1], self.DACs_limit_high[1], bSendToFPGA = True)
 
-	
 		
 	def openDevice(self, bConfigure=True, strSerial='', strFirmware='superlaserland.bit'):
 		if self.bVerbose == True:

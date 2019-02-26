@@ -76,7 +76,8 @@ class DisplayTransferFunctionWindow(QtGui.QWidget):
         #print('DisplayTransferFunctionWindow:addCurve() before first plot')
         try:
             #self.curve_mag_list.append(self.qplt_mag.getPlotItem().plot(pen=pg.mkPen(color=(R_value, G_value, B_value))))
-            self.curve_mag_list.append(self.qplt_mag.getPlotItem().plot(pen=current_color, symbol = 'o', symbolPen=None, symbolSize=3, symbolBrush=current_color))
+            self.qplt_mag.getPlotItem().addLegend(size=None, offset=(40*(1+len(self.curve_mag_list))-39, 150))
+            self.curve_mag_list.append(self.qplt_mag.getPlotItem().plot(pen=current_color, symbol = 'o', symbolPen=None, symbolSize=3, symbolBrush=current_color, name=str((len(self.transfer_function_list)-1))))
         except:
             print("addCurve exception:", sys.exc_info()[0])
 
@@ -93,7 +94,8 @@ class DisplayTransferFunctionWindow(QtGui.QWidget):
         #self.curve_phase_list[-1].attach(self.qplt_phase)
         #print('DisplayTransferFunctionWindow:addCurve() before 2nd plot')
         #self.curve_phase_list.append(self.qplt_phase.getPlotItem().plot())
-        self.curve_phase_list.append(self.qplt_phase.getPlotItem().plot(pen=current_color, symbol = 'o', symbolPen=None, symbolSize=3, symbolBrush=current_color))
+        self.qplt_phase.getPlotItem().addLegend(size=None, offset=(40*(1+len(self.curve_phase_list))-39, 150))
+        self.curve_phase_list.append(self.qplt_phase.getPlotItem().plot(pen=current_color, symbol = 'o', symbolPen=None, symbolSize=3, symbolBrush=current_color, name=str((len(self.transfer_function_list)-1))))
         #self.curve_phase_list[-1] = self.qplt_phase.getPlotItem().plot()
         #self.curve_phase_list[-1].setPen(Qt.QPen(current_color))
         # self.curve_phase_list[-1].setSymbol(Qwt.QwtSymbol(Qwt.QwtSymbol.Ellipse,
